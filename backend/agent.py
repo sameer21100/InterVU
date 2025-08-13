@@ -1,0 +1,74 @@
+import os
+from dotenv import load_dotenv
+
+from livekit import agents
+from livekit.agents import AgentSession, Agent, RoomInputOptions
+from livekit.plugins import (
+    noise_cancellation,
+)
+from livekit.plugins import google
+from prompt import AGENT_INSTRUCTION, SESSION_INSTRUCTION
+import os
+from livekit.plugins import tavus
+
+load_dotenv()
+
+
+
+
+
+
+class Assistant(Agent):
+    def __init__(self) -> None:
+        super().__init__(
+            instructions=AGENT_INSTRUCTION,
+            llm=google.beta.realtime.RealtimeModel(
+            voice="Puck",
+            temperature=0.8,
+        ),
+            # tools=[~
+            #     get_weather,
+            #     search_web,
+            #     send_email
+            # ],
+
+        )
+
+async def entrypoint(ctx: agents.JobContext):
+    session = AgentSession(
+        
+    )
+   
+
+    avatar = tavus.AvatarSession(
+      replica_id=os.environ.get("REPLICA_ID"),  
+      persona_id=os.environ.get("PERSONA_ID"),  
+      api_key=os.environ.get("TAVUS_API_KEY"),
+    )
+
+    # Start the avatar and wait for it to join
+    await avatar.start(session, room=ctx.room)
+
+
+
+    await session.start(
+        room=ctx.room,
+        agent=Assistant(),
+        room_input_options=RoomInputOptions(
+            # LiveKit Cloud enhanced noise cancellation
+            # - If self-hosting, omit this parameter
+            # - For telephony applications, use `BVCTelephony` for best results
+            video_enabled=True,
+            noise_cancellation=noise_cancellation.BVC(),
+        ),
+    )
+
+    await ctx.connect()
+
+    await session.generate_reply(
+        instructions=SESSION_INSTRUCTION,
+    )
+
+
+if __name__ == "__main__":
+    agents.cli.run_app(agents.WorkerOptions(entrypoint_fnc=entrypoint))
